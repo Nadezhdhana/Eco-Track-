@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoTrack - Sistem Manajemen & Pemilahan Sampah Sekolah</title>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --bg-light: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-light); color: var(--text-main); line-height: 1.6; }
+        
+        /* Aturan Role-Based UI */
+        body[data-role="siswa"] .admin-only { display: none !important; }
+        body[data-role="admin"] .siswa-only { display: none !important; }
+
+        header { background-color: var(--primary-dark); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-badge { background: rgba(255, 255, 255, 0.2); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.85rem; }
+        .container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        #login-section { max-width: 420px; margin: 4rem auto; background: var(--card-bg); padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }
+        input, select, button { width: 100%; padding: 0.75rem; margin-top: 0.5rem; margin-bottom: 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
+        button { background-color: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: var(--primary-dark); }
+        .btn-secondary { background-color: #3b82f6; }
+        .btn-secondary:hover { background-color: #2563eb; }
+        .btn-done { background-color: var(--primary); padding: 0.4rem 0.8rem; font-size: 0.85rem; width: auto; margin: 0; }
+        .btn-danger { background-color: var(--danger); padding: 0.4rem 0.8rem; font-size: 0.85rem; width: auto; margin: 0; margin-left: 4px; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .badge-pending { background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
+        .nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .tab-btn { width: auto; background-color: white; color: var(--text-main); border: 1px solid #d1d5db; padding: 0.6rem 1.2rem; margin: 0; }
+        .tab-btn.active { background-color: var(--primary-dark); color: white; border-color: var(--primary-dark); }
+        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .hidden { display: none !important; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background-color: #f9fafb; }
+        .map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .zone-box { border: 2px solid #d1d5db; border-radius: 10px; padding: 1.2rem; text-align: center; background: #f9fafb; }
+        .zone-box.dirty { border-color: var(--danger); background: #fef2f2; }
+        .zone-box.clean { border-color: var(--primary); background: #ecfdf5; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .stat-card { background: #f8fafc; padding: 1.2rem; border-radius: 8px; border-left: 4px solid var(--primary); }
+        .admin-badge { background: #ef4444; color: white; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem; }
+    /* Sembunyikan elemen khusus Admin jika yang login adalah Siswa */
+body[data-role="siswa"] .admin-only { display: none !important; 
+}
+</style>
+</head>
+<body>
+    <header>
+        <div>
+            <h2>EcoTrack</h2>
+            <small>Sistem Manajemen & Pemilahan Sampah Terpadu</small>
+        </div>
+        <div class="status-badge" id="db-status">Menghubungkan ke Cloud...</div>
+    </header>
+
+    <!-- HALAMAN LOGIN DENGAN PILIHAN KELAS -->
+    <section id="login-section">
+        <h3>Login Pengguna / Petugas</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Masukkan identitas dan pilih kelas Anda</p>
+        <input type="text" id="username-input" placeholder="Nama Lengkap..." required>
+        
+        <label style="text-align: left; display: block; font-size: 0.85rem; color: var(--text-muted);">Pilih Kelas:</label>
+        <select id="class-input">
+            <option value="Kelas X-1">Kelas X-1</option>
+            <option value="Kelas X-2">Kelas X-2</option>
+            <option value="Kelas X-3">Kelas X-3</option>
+            <option value="Kelas X-4">Kelas X-4</option>
+            <option value="Kelas X-5">Kelas X-5</option>
+            <option value="Kelas X-6">Kelas X-6</option>
+            <option value="Kelas X-7">Kelas X-7</option>
+            <option value="Kelas X-8">Kelas X-8</option>
+            <option value="Kelas X-9">Kelas X-9</option>
+            <option value="Kelas X-10">Kelas X-10</option>
+            <option value="Kelas X-11">Kelas X-11</option>
+            <option value="Kelas X-12">Kelas X-12</option>
+            <option value="Admin Sekolah">Admin Sekolah (Khusus 6 Pengurus)</option>
+        </select>
+
+        <input type="password" id="password-input" placeholder="Kata Sandi / PIN Akses" required>
+        <button onclick="loginUser()">Masuk ke Sistem</button>
+    </section>
+
+    <!-- DASHBOARD UTAMA -->
+    <main class="container hidden" id="dashboard-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <p>Halo, <strong id="display-user">Pengguna</strong> (<span id="display-class">Kelas</span>) <span id="admin-tag"></span></p>
+            <button onclick="logoutUser()" style="width: auto; background: #6b7280; padding: 0.4rem 1rem; margin: 0;">Keluar</button>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('klasemen', this)">1. Klasemen Kebersihan</button>
+            <button class="tab-btn" onclick="switchTab('laporan', this)">2. Eco-Report & Lapor</button>
+            <button class="tab-btn" onclick="switchTab('denah', this)">3. Denah Interaktif</button>
+            <button class="tab-btn" onclick="switchTab('piket', this)">4. Penugasan & Jadwal Piket</button>
+            <button class="tab-btn" onclick="switchTab('rekap', this)">5. Rekap & Analisis</button>
+<button class="tab-btn" onclick="switchTab('dokumentasi', this)">6. Dokumentasi Kegiatan</button>
+        </div>
+
+        <!-- MODUL 1: KLASEMEN -->
+        <div id="tab-klasemen" class="card module-tab">
+            <h3>Klasemen Kebersihan Kelas</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Poin dihitung berdasarkan kedisiplinan kebersihan tiap kelas masing-masing.</p>
+            <table>
+                <thead>
+                    <tr><th>Peringkat</th><th>Nama Kelas</th><th>Status Saat Ini</th><th>Skor Kebersihan</th></tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+            </table>
+        </div>
+
+<!-- KOTAK VALIDASI KHUSUS ADMIN -->
+    <div class="card admin-only" style="border-left: 4px solid var(--primary); margin-bottom: 1.5rem;">
+        <h3>Validasi Laporan Masuk (Khusus Admin)</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Periksa laporan dari siswa. Klik <strong>✔</strong> untuk menyelesaikan, atau <strong>❌</strong> untuk menghapus.</p>
+        <table>
+            <thead>
+                <tr><th>Lokasi</th><th>Jenis & Keterangan</th><th>Pelapor</th><th>Aksi Validasi</th></tr>
+            </thead>
+            <tbody id="tabel-validasi-admin">
+                <tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+        <!-- MODUL 2: LAPORAN -->
+        <div id="tab-laporan" class="card module-tab hidden">
+            <h3>Modul Pendataan Sampah / Eco-Report</h3>
+            <div style="display: flex; gap: 0.5rem; margin: 1rem 0;">
+                <button onclick="toggleSubReport('form')" style="width: auto;">Form Lapor Sampah Liar</button>
+                <button onclick="toggleSubReport('edukasi')" class="btn-secondary" style="width: auto;">Panduan Pemilahan Sampah</button>
+            </div>
+            <div id="sub-form">
+                <label>Pilih Lokasi / Kelas:</label>
+                <select id="report-zone">
+                    <option value="Kelas X-1">Kelas X-1</option>
+                    <option value="Kelas X-2">Kelas X-2</option>
+                    <option value="Kelas X-3">Kelas X-3</option>
+                    <option value="Kelas X-4">Kelas X-4</option>
+                    <option value="Kelas X-5">Kelas X-5</option>
+                    <option value="Kelas X-6">Kelas X-6</option>
+                    <option value="Kelas X-7">Kelas X-7</option>
+                    <option value="Kelas X-8">Kelas X-8</option>
+                    <option value="Kelas X-9">Kelas X-9</option>
+                    <option value="Kelas X-10">Kelas X-10</option>
+                    <option value="Kelas X-11">Kelas X-11</option>
+                    <option value="Kelas X-12">Kelas X-12</option>
+                </select>
+                <label>Jenis Sampah:</label>
+                <select id="report-type">
+                    <option value="Organik (Sisa Makanan/Daun)">Organik (Sisa Makanan/Daun)</option>
+                    <option value="Anorganik (Plastik/Botol/Kertas)">Anorganik (Plastik/Botol/Kertas)</option>
+                    <option value="B3 (Baterai/Elektronik/Kimia)">B3 (Baterai/Elektronik/Kimia)</option>
+                </select>
+                <label>Keterangan & Bukti / Foto:</label>
+                <input type="text" id="report-desc" placeholder="Contoh: Tumpukan botol plastik di bawah meja...">
+                <button onclick="kirimLaporan()">Kirim Laporan ke Cloud</button>
+            </div>
+            <div id="sub-edukasi" class="hidden" style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <h4>Panduan Pemilahan Sampah</h4>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li><strong>Tong Hijau (Organik):</strong> Sisa makanan, daun kering.</li>
+                    <li><strong>Tong Kuning (Anorganik):</strong> Botol plastik, kaleng, kertas.</li>
+                    <li><strong>Tong Merah (B3):</strong> Baterai bekas, lampu neon, limbah berbahaya.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- MODUL 3: DENAH INTERAKTIF -->
+        <div id="tab-denah" class="card module-tab hidden">
+            <h3>Denah Kebersihan Kelas Interaktif</h3>
+            <div class="map-grid" id="interactive-map"></div>
+        </div>
+
+        <!-- MODUL 4: PENUGASAN & JADWAL PIKET KELAS -->
+        <div id="tab-piket" class="card module-tab hidden">
+            <h3>Jadwal Piket & Penugasan Pembersihan</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;" id="info-piket-kelas">Menampilkan jadwal piket untuk kelas Anda.</p>
+            <table>
+                <thead>
+                    <tr><th>Lokasi Kelas</th><th>Jenis Sampah</th><th>Keterangan</th><th>Pelapor</th><th>Aksi / Selesai</th></tr>
+                </thead>
+                <tbody id="piket-body"></tbody>
+            </table>
+        </div>
+
+        <!-- MODUL 5: REKAP -->
+        <div id="tab-rekap" class="card module-tab hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <h3>Rekap & Evaluasi Data Otomatis</h3>
+                <button class="btn-danger admin-only" onclick="resetSemuaLaporan()">Reset Semua Data Laporan (Admin)</button>
+            </div>
+            <div class="stats-grid" style="margin-top: 1rem;">
+                <div class="stat-card"><small>Total Laporan Masuk</small><h2 id="stat-total">0</h2></div>
+                <div class="stat-card" style="border-left-color: var(--warning);"><small>Menunggu Pembersihan</small><h2 id="stat-pending">0</h2></div>
+                <div class="stat-card" style="border-left-color: #3b82f6;"><small>Selesai Dibersihkan</small><h2 id="stat-done">0</h2></div>
+            </div>
+        </div>
+    <!-- MODUL 6: DOKUMENTASI KEGIATAN -->
+        <div id="tab-dokumentasi" class="card module-tab hidden">
+            <h3>Dokumentasi & Galeri Kebersihan Kelas</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Bagikan momen atau hasil kerja bakti kebersihan kelas Anda.</p>
+            
+            <!-- Form Upload Dokumentasi Langsung dari Perangkat -->
+            <div style="background: #f8fafc; padding: 1.2rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #e5e7eb;">
+                <h4 style="margin-bottom: 0.5rem;">Unggah Dokumentasi Baru</h4>
+                <label>Keterangan / Judul Kegiatan:</label>
+                <input type="text" id="input-doc-ket" placeholder="Contoh: Gotong royong membersihkan ruang kelas X-1...">
+                
+                <label>Pilih Foto dari Perangkat (Galeri/Komputer):</label>
+                <input type="file" id="input-doc-file" accept="image/*" style="margin-bottom: 1rem; background: white; padding: 0.5rem;">
+                
+                <button onclick="kirimDokumentasi()" style="margin-top: 0.5rem;">Kirim ke Galeri</button>
+            </div>
+
+            <!-- Tampilan Galeri Foto -->
+            <div class="map-grid" id="galeri-dokumentasi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <!-- Foto dokumentasi akan muncul otomatis di sini -->
+            </div>
+        </div>
+</main>
+
+    <!-- SCRIPT FIREBASE & LOGIKA APLIKASI -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA9U4QFz_irQOXUOHJSVkzi0q5SpPzCwLM",
+            authDomain: "eco-track-29054.firebaseapp.com",
+            databaseURL: "https://eco-track-29054-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "eco-track-29054",
+            storageBucket: "eco-track-29054.appspot.com",
+            messagingSenderId: "857947782172",
+            appId: "1:857947782172:web:bf49bb5ad090c34093f3d9"
+        };
+
+        let db, laporanRef;
+        let cachedLaporan = [];
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            laporanRef = ref(db, 'laporan_sampah');
+            document.getElementById('db-status').innerText = "● Cloud Terhubung";
+        } catch (error) {
+            document.getElementById('db-status').innerText = "● Gagal Koneksi Cloud";
+        }
+
+        // Pemetaan Zona menggunakan Kelas Masing-Masing
+        const daftarZona = [
+            "Kelas X-1", "Kelas X-2", "Kelas X-3", "Kelas X-4",
+            "Kelas X-5", "Kelas X-6", "Kelas X-7", "Kelas X-8",
+            "Kelas X-9", "Kelas X-10", "Kelas X-11", "Kelas X-12"
+        ];
+
+        function terapkanSesiDashboard(nama, kelas) {
+            const isAdmin = (kelas === "Admin Sekolah");
+            const role = isAdmin ? "admin" : "siswa";
+
+            document.body.setAttribute('data-role', role);
+
+            document.getElementById('display-user').innerText = nama;
+            document.getElementById('display-class').innerText = kelas;
+
+            const infoPiket = document.getElementById('info-piket-kelas');
+            if (isAdmin) {
+                document.getElementById('admin-tag').innerHTML = '<span class="admin-badge">ADMIN UTAMA</span>';
+                infoPiket.innerHTML = 'Mode Admin: Anda memiliki akses penuh untuk <strong>memvalidasi</strong> dan <strong>menghapus</strong> semua laporan kelas.';
+            } else {
+                document.getElementById('admin-tag').innerHTML = '';
+                infoPiket.innerHTML = `Area tanggung jawab Anda adalah <strong>${kelas}</strong>. Anda hanya dapat menandai selesai tugas piket untuk kelas Anda sendiri.`;
+            }
+
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+
+            renderSemuaModul(cachedLaporan);
+        }
+
+        window.loginUser = function() {
+            const nama = document.getElementById('username-input').value.trim();
+            const kelas = document.getElementById('class-input').value;
+            const password = document.getElementById('password-input').value;
+
+            if (!nama || !password) {
+                alert("Harap masukkan Nama dan Kata Sandi!");
+                return;
+            }
+
+            if (kelas === "Admin Sekolah") {
+    if (password !== "AndiUlfa123!") { 
+        alert("Kata sandi Admin salah!");
+        return;
+    }
+    document.body.setAttribute('data-role', 'admin');
+} else {
+    if (password !== "EcoTrack2") { 
+        alert("Kata sandi kelas salah!");
+        return;
+    }
+    document.body.setAttribute('data-role', 'siswa');
+}
+
+            sessionStorage.setItem('ecotrack_nama', nama);
+            sessionStorage.setItem('ecotrack_kelas', kelas);
+
+            terapkanSesiDashboard(nama, kelas);
+        };
+
+        window.logoutUser = function() {
+            sessionStorage.removeItem('ecotrack_nama');
+            sessionStorage.removeItem('ecotrack_kelas');
+            document.body.removeAttribute('data-role');
+            document.getElementById('password-input').value = "";
+
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedNama = sessionStorage.getItem('ecotrack_nama');
+            const savedKelas = sessionStorage.getItem('ecotrack_kelas');
+            if (savedNama && savedKelas) {
+                terapkanSesiDashboard(savedNama, savedKelas);
+            }
+        });
+
+        window.switchTab = function(tabName, btnElement) {
+            document.querySelectorAll('.module-tab').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            btnElement.classList.add('active');
+        };
+
+        window.toggleSubReport = function(mode) {
+            if (mode === 'form') {
+                document.getElementById('sub-form').classList.remove('hidden');
+                document.getElementById('sub-edukasi').classList.add('hidden');
+            } else {
+                document.getElementById('sub-form').classList.add('hidden');
+                document.getElementById('sub-edukasi').classList.remove('hidden');
+            }
+        };
+
+        window.kirimLaporan = function() {
+            const zona = document.getElementById('report-zone').value;
+            const jenis = document.getElementById('report-type').value;
+            const ket = document.getElementById('report-desc').value.trim();
+            const pelapor = document.getElementById('display-user').innerText + " (" + document.getElementById('display-class').innerText + ")";
+            
+            if (!ket) { alert("Isi keterangan laporan!"); return; }
+
+            push(laporanRef, {
+                zona: zona, jenis: jenis, keterangan: ket, pelapor: pelapor,
+                status: "Belum Dibersihkan", waktu: new Date().toLocaleString('id-ID')
+            }).then(() => {
+                alert("Laporan berhasil dikirim ke Cloud Pusat!");
+                document.getElementById('report-desc').value = "";
+            });
+        };
+
+        window.selesaikanPiket = function(idLaporan) {
+            const penyelesai = `${document.getElementById('display-user').innerText} (${document.getElementById('display-class').innerText})`;
+            update(ref(db, 'laporan_sampah/' + idLaporan), {
+                status: "Selesai",
+                diselesaikanOleh: penyelesai
+            });
+        };
+
+        window.hapusLaporan = function(idLaporan) {
+            if (sessionStorage.getItem('ecotrack_kelas') !== "Admin Sekolah") return;
+            if (confirm("Yakin ingin menghapus laporan ini secara permanen?")) {
+                remove(ref(db, 'laporan_sampah/' + idLaporan));
+            }
+        };
+
+        window.resetSemuaLaporan = function() {
+            if (sessionStorage.getItem('ecotrack_kelas') !== "Admin Sekolah") return;
+            if (confirm("PERINGATAN: Semua riwayat laporan akan dihapus dan skor semua kelas kembali ke 100. Lanjutkan?")) {
+                remove(laporanRef);
+            }
+        };
+
+        if (laporanRef) {
+            onValue(laporanRef, (snapshot) => {
+                const data = snapshot.val();
+                cachedLaporan = [];
+                if (data) {
+                    for (let id in data) { cachedLaporan.push({ id: id, ...data[id] }); }
+                }
+                renderSemuaModul(cachedLaporan);
+            });
+        }
+
+        function renderSemuaModul(laporanList) {
+const validasiBody = document.getElementById('tabel-validasi-admin');
+        if (validasiBody) {
+            validasiBody.innerHTML = "";
+            let adaLaporanBaru = false;
+            
+            laporanList.forEach(item => {
+                if (item.status === "Belum Dibersihkan") {
+                    adaLaporanBaru = true;
+                    validasiBody.innerHTML += `<tr>
+                        <td><strong>${item.zona}</strong></td>
+                        <td>${item.jenis}<br><small style="color:var(--text-muted);">${item.keterangan}</small></td>
+                        <td>${item.pelapor}</td>
+                        <td>
+                            <button class="btn-done" onclick="selesaikanPiket('${item.id}')" style="width: auto; padding: 0.3rem 0.6rem;">✔</button>
+                            <button class="btn-danger" onclick="hapusLaporan('${item.id}')" style="width: auto; padding: 0.3rem 0.6rem; margin-left: 4px;">❌</button>
+                        </td>
+                    </tr>`;
+                }
+            });
+
+            if (!adaLaporanBaru) {
+                validasiBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Tidak ada laporan masuk yang perlu divalidasi.</td></tr>`;
+            }
+        }
+            const currentKelas = sessionStorage.getItem('ecotrack_kelas') || "";
+            const isAdmin = (currentKelas === "Admin Sekolah");
+
+            let total = laporanList.length, pending = 0, done = 0;
+            let skorZona = {};
+            daftarZona.forEach(z => skorZona[z] = 100);
+
+            const piketBody = document.getElementById('piket-body');
+            piketBody.innerHTML = "";
+
+            laporanList.forEach(item => {
+                if (item.status === "Belum Dibersihkan") {
+                    pending++;
+                    if (skorZona[item.zona] !== undefined) skorZona[item.zona] -= 15;
+                } else {
+                    done++;
+                    if (skorZona[item.zona] !== undefined) skorZona[item.zona] += 5;
+                }
+
+                let tombolAksi = "";
+                // Hanya Admin atau siswa dari kelas yang bersangkutan yang bisa menandai selesai
+                const bolehMenyelesaikan = isAdmin || (item.zona === currentKelas);
+
+                if (item.status === "Belum Dibersihkan") {
+                    if (bolehMenyelesaikan) {
+                        tombolAksi = `<button class="btn-done" onclick="selesaikanPiket('${item.id}')">Tandai Selesai</button>`;
+                    } else {
+                        tombolAksi = `<span class="badge-pending">Menunggu Piket ${item.zona}</span>`;
+                    }
+                } else {
+                    const infoSelesai = item.diselesaikanOleh ? `<br><small style="color:var(--text-muted);">oleh ${item.diselesaikanOleh}</small>` : "";
+                    tombolAksi = `<span style="color: var(--primary-dark); font-weight: bold;">✔ Selesai</span>${infoSelesai}`;
+                }
+
+                if (isAdmin) {
+                    tombolAksi += ` <button class="btn-danger" onclick="hapusLaporan('${item.id}')">Hapus</button>`;
+                }
+
+                piketBody.innerHTML += `<tr>
+                    <td><strong>${item.zona}</strong><br><small style="color:var(--text-muted);">${item.waktu || ''}</small></td>
+                    <td>${item.jenis}</td>
+                    <td>${item.keterangan}</td>
+                    <td>${item.pelapor}</td>
+                    <td>${tombolAksi}</td>
+                </tr>`;
+            });
+
+            if (laporanList.length === 0) {
+                piketBody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Belum ada tugas piket / laporan aktif.</td></tr>`;
+            }
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-pending').innerText = pending;
+            document.getElementById('stat-done').innerText = done;
+
+            const klasemenArray = Object.keys(skorZona).map(nama => ({ nama: nama, skor: skorZona[nama] })).sort((a, b) => b.skor - a.skor);
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            const mapGrid = document.getElementById('interactive-map');
+            leaderboardBody.innerHTML = ""; mapGrid.innerHTML = "";
+
+            klasemenArray.forEach((z, index) => {
+                const adaLaporanAktif = laporanList.some(l => l.zona === z.nama && l.status === "Belum Dibersihkan");
+                const statusTeks = adaLaporanAktif ? "Perlu Dibersihkan" : "Bersih";
+                const statusWarna = adaLaporanAktif ? "color: var(--danger);" : "color: var(--primary-dark);";
+
+                leaderboardBody.innerHTML += `<tr><td>#${index + 1}</td><td><strong>${z.nama}</strong></td><td style="${statusWarna} font-weight: bold;">${statusTeks}</td><td>${z.skor} Poin</td></tr>`;
+                mapGrid.innerHTML += `<div class="zone-box ${adaLaporanAktif ? 'dirty' : 'clean'}"><h4>${z.nama}</h4><p style="margin: 0.5rem 0; font-weight: bold; ${statusWarna}">${statusTeks}</p><small>Skor: ${z.skor}</small></div>`;
+            });
+        }
+const dokumentasiRef = ref(db, 'dokumentasi_kegiatan');
+
+        window.kirimDokumentasi = function() {
+            const ket = document.getElementById('input-doc-ket').value.trim();
+            const fileInput = document.getElementById('input-doc-file');
+            const pengirim = document.getElementById('display-user').innerText + " (" + document.getElementById('display-class').innerText + ")";
+
+            if (!ket) {
+                alert("Harap isi keterangan kegiatan terlebih dahulu!");
+                return;
+            }
+
+            if (fileInput.files.length === 0) {
+                alert("Harap pilih foto dokumentasi terlebih dahulu!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const base64Image = event.target.result;
+
+                push(dokumentasiRef, {
+                    keterangan: ket,
+                    gambar: base64Image,
+                    pengirim: pengirim,
+                    waktu: new Date().toLocaleString('id-ID')
+                }).then(() => {
+                    alert("Dokumentasi berhasil diunggah ke galeri!");
+                    document.getElementById('input-doc-ket').value = "";
+                    fileInput.value = "";
+                }).catch((error) => {
+                    alert("Gagal mengunggah foto. Ukuran foto mungkin terlalu besar.");
+                });
+            };
+
+            reader.readAsDataURL(file);
+        };
+
+        if (dokumentasiRef) {
+            onValue(dokumentasiRef, (snapshot) => {
+                const data = snapshot.val();
+                const galeriGrid = document.getElementById('galeri-dokumentasi-grid');
+                if (!galeriGrid) return;
+                
+                galeriGrid.innerHTML = "";
+                if (data) {
+                    for (let id in data) {
+                        const item = data[id];
+                        galeriGrid.innerHTML += `
+                            <div class="zone-box" style="text-align: left; background: white; padding: 1rem;">
+                                <img src="${item.gambar}" alt="Foto Kegiatan" style="width: 100%; height: 140px; object-fit: cover; border-radius: 6px; margin-bottom: 0.5rem;">
+                                <p style="font-weight: bold; font-size: 0.95rem; margin-bottom: 0.3rem;">${item.keterangan}</p>
+                                <small style="color: var(--text-muted); display: block;">Oleh: ${item.pengirim}</small>
+                                <small style="color: var(--text-muted);">${item.waktu}</small>
+                            </div>
+                        `;
+                    }
+                } else {
+                    galeriGrid.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Belum ada dokumentasi kegiatan yang diunggah.</p>`;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
